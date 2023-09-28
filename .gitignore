@@ -1,0 +1,6 @@
+**/*.onnx
+**/*.bin
+**/*.pt
+**/__pycache__/
+/*fake/
+/venv/
