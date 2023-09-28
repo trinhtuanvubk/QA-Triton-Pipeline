@@ -23,7 +23,7 @@ def main():
     response = client.infer(model_name="pipeline", inputs=[input_array], outputs=[output])
     res = response.as_numpy("paraphrase_answer")
     final_res = [i.decode("utf-8") for i in res]
-    print(final_res) 
+    print(final_res)
 
 
 if __name__=="__main__":

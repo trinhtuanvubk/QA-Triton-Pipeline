@@ -192,10 +192,7 @@ class TritonPythonModel:
             all_tgt_texts = [tokenizer.batch_decode(translated[i*num_return_sequence:(i+1)*num_return_sequence], skip_special_tokens=True) for i in range(len(answers))]
             
             final_anwers = [random.choice(answer) for answer in all_tgt_texts]
-            # import inspect
-            # print(inspect.signature(model.generate))
-            # tgt_text = tokenizer.batch_decode(translated, skip_special_tokens=True)
-            # print(tgt_text)
+
             
             # ==== Sending Response ====
             last_output_tensor = pb_utils.Tensor(
@@ -207,12 +204,5 @@ class TritonPythonModel:
 
             return responses
 
-# intentions = [["top-up"]]
-# slots = [['O', 'O', 'O', 'O', 'B-TOP_UP', 'B-MY', 'B-NUMBER', 'O','B-NUMBER']]
-
-# slots = ([list(set([element.replace("B-","").replace("I-","") for element in slot if element != "O"])) for slot in slots])
-# answers = [get_response(intent,slot) for intent, slot in zip(intentions,slots)]
-
-# print(slots, intentions)
 
 
