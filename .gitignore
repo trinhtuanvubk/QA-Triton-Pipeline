@@ -4,3 +4,5 @@
 **/__pycache__/
 /*fake/
 /venv/
+trash*.py
+test*.py

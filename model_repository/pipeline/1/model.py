@@ -4,6 +4,7 @@ import torch
 from torch import autocast
 from pathlib import Path
 import pandas as pd
+import random
 
 import triton_python_backend_utils as pb_utils
 
@@ -174,27 +175,31 @@ class TritonPythonModel:
             dict_slot = [[{"entity":s,"value":tokenized_transcriptions[id_sent][index]} for index, s in enumerate(slot)] for id_sent, slot in enumerate(slots)]
             answers = [get_response(intent,slot) for (intent, slot) in zip(intentions,dict_slot)]
             
-
+            num_return_sequence = 10
             batch = tokenizer(['Paraphrasing this sentence: ' + answer for answer in answers],
-                            truncation=True,
-                            padding=True,
-                            return_tensors="pt").to('cuda')
+                    truncation=True,
+                    padding='longest',
+                    max_length=256,
+                    return_tensors="pt").to("cuda")
+            
             # print(model.generate.__dict__)
             translated = t5_model.generate(**batch,
-                            max_length=200,
-                            num_beams=4,
-                            num_return_sequences=10,
-                            temperature=1.5,
-                            do_sample=True,
-                            top_k=20)
+                                max_length=256,
+                                num_beams=10,
+                                num_return_sequences=num_return_sequence,
+                                temperature=1.3)
+            # num_sentences = len(answers)
+            all_tgt_texts = [tokenizer.batch_decode(translated[i*num_return_sequence:(i+1)*num_return_sequence], skip_special_tokens=True) for i in range(len(answers))]
+            
+            final_anwers = [random.choice(answer) for answer in all_tgt_texts]
             # import inspect
             # print(inspect.signature(model.generate))
-            tgt_text = tokenizer.batch_decode(translated, skip_special_tokens=True)
+            # tgt_text = tokenizer.batch_decode(translated, skip_special_tokens=True)
             # print(tgt_text)
             
             # ==== Sending Response ====
             last_output_tensor = pb_utils.Tensor(
-                "paraphrase_answer", np.array([i.encode('utf-8') for i in tgt_text], dtype=self._dtypes[0]))
+                "paraphrase_answer", np.array([i.encode('utf-8') for i in final_anwers], dtype=self._dtypes[0]))
             
             inference_response = pb_utils.InferenceResponse([last_output_tensor])
         
