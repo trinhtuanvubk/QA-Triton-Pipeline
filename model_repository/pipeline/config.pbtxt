@@ -1,0 +1,19 @@
+name: "pipeline"
+backend: "python"
+max_batch_size: 0
+
+input [
+    {
+        name: "input"
+        data_type: TYPE_FP32
+        dims: [-1, -1]
+    }
+]
+
+output [
+    {
+        name: "paraphrase_answer"
+        data_type: TYPE_STRING
+        dims: [-1, 1]
+    }
+]
