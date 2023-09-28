@@ -6,3 +6,4 @@
 /venv/
 trash*.py
 test*.py
+docker-compose.yml
