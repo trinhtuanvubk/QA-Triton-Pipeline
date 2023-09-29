@@ -32,35 +32,8 @@ slot_label_path = str(cur_folder/SLOT_LABEL)
 mapping_data_path = str(cur_folder/MAPPING_DATA)
 t5_path = str(cur_folder/T5_PATH)
 
+# load mapping excel file
 mapping_df = pd.read_excel(mapping_data_path).dropna(how='all')
-# t5_model = T5ForConditionalGeneration.from_pretrained(t5_path, local_files_only=True).to('cuda')
-# tokenizer = AutoTokenizer.from_pretrained(t5_tokenizer_path, local_files_only=True)
-
-# def get_response(intent, predicted_entities):
-
-#     entities = {ent['entity']: ent['value'] for ent in predicted_entities}
-#     intent_rows = mapping_df[mapping_df['intent'] == intent]
-
-#     for _, row in intent_rows.iterrows():
-#         all_match = True
-#         for i in range(1, 4):
-#             entity_col = f'entity_{i}'
-#             value_col = f'entity_{i}_value'
-#             if pd.isna(row[entity_col]):
-#                 continue
-#             elif row[entity_col] in entities and (pd.isna(row[value_col]) or entities[row[entity_col]] == row[value_col]):
-#                 continue
-#             else:
-#                 all_match = False
-#                 break
-#         if all_match:
-#             return row['expected prompt']
-
-#     if not intent_rows.empty:
-#         return intent_rows.sample(n=1)['expected prompt'].values[0]
-
-#     return "Sorry, I couldn't find a response for your request."
-
 
 
 class TritonPythonModel:
