@@ -7,3 +7,4 @@
 trash*.py
 test*.py
 docker-compose.yml
+t5*

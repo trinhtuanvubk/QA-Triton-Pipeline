@@ -33,33 +33,33 @@ mapping_data_path = str(cur_folder/MAPPING_DATA)
 t5_path = str(cur_folder/T5_PATH)
 
 mapping_df = pd.read_excel(mapping_data_path).dropna(how='all')
-t5_model = T5ForConditionalGeneration.from_pretrained(t5_path, local_files_only=True).to('cuda')
-tokenizer = AutoTokenizer.from_pretrained(t5_tokenizer_path, local_files_only=True)
+# t5_model = T5ForConditionalGeneration.from_pretrained(t5_path, local_files_only=True).to('cuda')
+# tokenizer = AutoTokenizer.from_pretrained(t5_tokenizer_path, local_files_only=True)
 
-def get_response(intent, predicted_entities):
+# def get_response(intent, predicted_entities):
 
-    entities = {ent['entity']: ent['value'] for ent in predicted_entities}
-    intent_rows = mapping_df[mapping_df['intent'] == intent]
+#     entities = {ent['entity']: ent['value'] for ent in predicted_entities}
+#     intent_rows = mapping_df[mapping_df['intent'] == intent]
 
-    for _, row in intent_rows.iterrows():
-        all_match = True
-        for i in range(1, 4):
-            entity_col = f'entity_{i}'
-            value_col = f'entity_{i}_value'
-            if pd.isna(row[entity_col]):
-                continue
-            elif row[entity_col] in entities and (pd.isna(row[value_col]) or entities[row[entity_col]] == row[value_col]):
-                continue
-            else:
-                all_match = False
-                break
-        if all_match:
-            return row['expected prompt']
+#     for _, row in intent_rows.iterrows():
+#         all_match = True
+#         for i in range(1, 4):
+#             entity_col = f'entity_{i}'
+#             value_col = f'entity_{i}_value'
+#             if pd.isna(row[entity_col]):
+#                 continue
+#             elif row[entity_col] in entities and (pd.isna(row[value_col]) or entities[row[entity_col]] == row[value_col]):
+#                 continue
+#             else:
+#                 all_match = False
+#                 break
+#         if all_match:
+#             return row['expected prompt']
 
-    if not intent_rows.empty:
-        return intent_rows.sample(n=1)['expected prompt'].values[0]
+#     if not intent_rows.empty:
+#         return intent_rows.sample(n=1)['expected prompt'].values[0]
 
-    return "Sorry, I couldn't find a response for your request."
+#     return "Sorry, I couldn't find a response for your request."
 
 
 
@@ -72,8 +72,11 @@ class TritonPythonModel:
         #convert triton type to numpy type/
         self.last_output_dtype = pb_utils.triton_string_to_numpy(last_output_config["data_type"])
 
+        # load wav2vec2 processor
+        self.processor = Wav2Vec2Processor.from_pretrained(wav2vec_processor_path, local_files_only=True)
+
         # load roberta tokenizer
-        self.tokenizer = RobertaTokenizer.from_pretrained(roberta_tokenizer_path, local_files_only=True)
+        self.roberta_tokenizer = RobertaTokenizer.from_pretrained(roberta_tokenizer_path, local_files_only=True)
 
         # load dict intent and dict tag
         intent_label_lst = util.get_intent_labels(intent_label_path)
@@ -82,8 +85,10 @@ class TritonPythonModel:
         slot_label_lst = util.get_slot_labels(slot_label_path)
         self.dict_tags = {i: tag for i, tag in enumerate(slot_label_lst)}
 
-        # load wav2vec2 processor
-        self.processor = Wav2Vec2Processor.from_pretrained(wav2vec_processor_path, local_files_only=True)
+        # load t5 tokenizer and t5 model
+        self.t5_model = T5ForConditionalGeneration.from_pretrained(t5_path, local_files_only=True).to('cuda')
+        self.t5_tokenizer = AutoTokenizer.from_pretrained(t5_tokenizer_path, local_files_only=True)
+        
         
         # string dtype
         self._dtypes = [np.bytes_, np.object_]
@@ -118,7 +123,7 @@ class TritonPythonModel:
             
             # ==== JointBert ====
             # string = "customer service"
-            joinbert_inputs = self.tokenizer(transcriptions, padding=True, truncation=True, return_tensors='pt')
+            joinbert_inputs = self.roberta_tokenizer(transcriptions, padding=True, truncation=True, return_tensors='pt')
             _input_ids = joinbert_inputs.input_ids
             _attention_mask = joinbert_inputs.attention_mask
 
@@ -162,7 +167,7 @@ class TritonPythonModel:
             logger.debug(f"{intent_preds}-{best_tags_list}")
 
             intentions =  [self.dict_intents[i] for i in intent_preds]
-            slots = util.post_processing(_input_ids, best_tags_list, self.tokenizer)
+            slots = util.post_processing(_input_ids, best_tags_list, self.roberta_tokenizer)
             slots = [[self.dict_tags[i] for i in tag] for tag in slots]
 
             logger.debug(f"{intentions}-{slots}")
@@ -173,23 +178,24 @@ class TritonPythonModel:
             slots = ([list(set([element.replace("B-","").replace("I-","") for element in slot if element != "O"])) for slot in slots])
             tokenized_transcriptions = [sent.split() for sent in transcriptions]
             dict_slot = [[{"entity":s,"value":tokenized_transcriptions[id_sent][index]} for index, s in enumerate(slot)] for id_sent, slot in enumerate(slots)]
-            answers = [get_response(intent,slot) for (intent, slot) in zip(intentions,dict_slot)]
+            answers = [util.get_response(intent, slot, mapping_df) for (intent, slot) in zip(intentions,dict_slot)]
             
             num_return_sequence = 10
-            batch = tokenizer(['Paraphrasing this sentence: ' + answer for answer in answers],
+            batch = self.t5_tokenizer(['Paraphrasing this sentence: ' + answer for answer in answers],
                     truncation=True,
                     padding='longest',
                     max_length=256,
                     return_tensors="pt").to("cuda")
             
             # print(model.generate.__dict__)
-            translated = t5_model.generate(**batch,
+            translated = self.t5_model.generate(**batch,
                                 max_length=256,
                                 num_beams=10,
                                 num_return_sequences=num_return_sequence,
+                                do_sample=True,
                                 temperature=1.3)
             # num_sentences = len(answers)
-            all_tgt_texts = [tokenizer.batch_decode(translated[i*num_return_sequence:(i+1)*num_return_sequence], skip_special_tokens=True) for i in range(len(answers))]
+            all_tgt_texts = [self.t5_tokenizer.batch_decode(translated[i*num_return_sequence:(i+1)*num_return_sequence], skip_special_tokens=True) for i in range(len(answers))]
             
             final_anwers = [random.choice(answer) for answer in all_tgt_texts]
 
