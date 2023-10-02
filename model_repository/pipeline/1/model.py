@@ -13,6 +13,7 @@ from torch.utils.dlpack import to_dlpack, from_dlpack
 from transformers import RobertaTokenizer, Wav2Vec2Processor, T5ForConditionalGeneration, AutoTokenizer
 from loguru import logger
 from utils import crf_decode, util
+from utils.decoder import *
 
 ROBERTA_CONFIG = "config/roberta_config"
 WAV2VEC2_CONFIG = "config/wav2vec2_config"
@@ -21,7 +22,7 @@ INTENT_LABEL = "config/roberta_labels/intent_label.txt"
 SLOT_LABEL = "config/roberta_labels/slot_label.txt"
 MAPPING_DATA = "config/test_cases.xlsx"
 T5_PATH = "t5_paraphrase"
-
+LM_PATH = "ngram_model/4gram_small.arpa"
 
 cur_folder = Path(__file__).parent
 roberta_tokenizer_path = str(cur_folder/ROBERTA_CONFIG)
@@ -31,6 +32,8 @@ intent_label_path = str(cur_folder/INTENT_LABEL)
 slot_label_path = str(cur_folder/SLOT_LABEL)
 mapping_data_path = str(cur_folder/MAPPING_DATA)
 t5_path = str(cur_folder/T5_PATH)
+lm_path = str(cur_folder/LM_PATH)
+
 
 # load mapping excel file
 mapping_df = pd.read_excel(mapping_data_path).dropna(how='all')
@@ -61,6 +64,22 @@ class TritonPythonModel:
         # load t5 tokenizer and t5 model
         self.t5_model = T5ForConditionalGeneration.from_pretrained(t5_path, local_files_only=True).to('cuda')
         self.t5_tokenizer = AutoTokenizer.from_pretrained(t5_tokenizer_path, local_files_only=True)
+        vocab_dict = self.processor.tokenizer.get_vocab()
+        sort_vocab = sorted((value, key) for (key,value) in vocab_dict.items())
+
+        # Lower case ALL letters
+        vocab = []
+        for _, token in sort_vocab:
+            vocab.append(token.lower())
+
+        # replace the word delimiter with a white space since the white space is used by the decoders
+        vocab[vocab.index(self.processor.tokenizer.word_delimiter_token)] = ' '
+        
+        self.beam_decoder = BeamCTCDecoder(vocab, lm_path=lm_path,
+                                 alpha=0, beta=0,
+                                 cutoff_top_n=40, cutoff_prob=1.0,
+                                 beam_width=32, num_processes=16,
+                                 blank_index=vocab.index(self.processor.tokenizer.pad_token))
         
         
         # string dtype
@@ -87,11 +106,20 @@ class TritonPythonModel:
                 logits = pb_utils.get_output_tensor_by_name(
                     trans_response, "output")
                 logits = from_dlpack(logits.to_dlpack()).clone()
+                
             logger.debug("logit shape:{}".format(logits.shape))
-            prediction = torch.argmax(logits, axis=-1)
-            logger.debug("prediction shape:{}".format(prediction.shape))
-            raw_transcription = self.processor.batch_decode(prediction)
-            transcriptions = [sen.lower() for sen in raw_transcription]
+            
+            beam_decoded_outputs, _ = self.beam_decoder.decode(logits)
+            transcriptions = [output[0].strip() for output in beam_decoded_outputs]
+
+            # logger.debug("beam dec:{}".format(beam_decoded_outputs.shape))
+            # transcriptions = beam_decoded_output[0]
+            
+            
+            # prediction = torch.argmax(logits, axis=-1)
+            # logger.debug("prediction shape:{}".format(prediction.shape))
+            # raw_transcription = self.processor.batch_decode(prediction)
+            # transcriptions = [sen.lower() for sen in raw_transcription]
             logger.debug("transcription:{}".format(transcriptions))
             
             # ==== JointBert ====
