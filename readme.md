@@ -6,6 +6,13 @@
 docker build -t triton_pineline .
 ```
 
+- Create environment for client
+```
+virtualenv venv
+source venv/bin/activate
+pip install -r requirements_client.txt
+```
+
 ### Prepare model
 - Move `jointbert .onnx`, `wav2vec2 .onnx`, `t5 .bin` to `model_repository`
 ![model tree](figures/model_tree.png)
