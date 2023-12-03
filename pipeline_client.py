@@ -6,6 +6,7 @@ from tritonclient.utils import *
 import tritonclient.http
 import soundfile
 import librosa
+from scipy.io.wavfile import write
 
 
 def main():
@@ -18,12 +19,12 @@ def main():
     # print(array.shape)
     input_array = tritonclient.http.InferInput("input", array.shape, "FP32")
     input_array.set_data_from_numpy(array)
-    output = tritonclient.http.InferRequestedOutput("paraphrase_answer")
+    output = tritonclient.http.InferRequestedOutput("output")
 
     response = client.infer(model_name="pipeline", inputs=[input_array], outputs=[output])
-    res = response.as_numpy("paraphrase_answer")
-    final_res = [i.decode("utf-8") for i in res]
-    print(final_res)
+    audio = response.as_numpy("output")
+    print(audio.shape)
+    write(data=np.squeeze(audio[0]), rate=22050, filename="./output_pipeline.wav")
 
 
 if __name__=="__main__":

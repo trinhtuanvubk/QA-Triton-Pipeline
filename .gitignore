@@ -4,7 +4,7 @@
 **/__pycache__/
 /*fake/
 /venv/
-trash*.py
+trash*
 test*.py
 docker-compose.yml
 model_repository/t5/

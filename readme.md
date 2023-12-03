@@ -3,7 +3,7 @@
 ### Installing
 - Create a image that wraps triton image
 ```
-docker build -t vc-test .
+docker build -t triton-pipeline .
 ```
 
 - Create environment for client
@@ -20,7 +20,7 @@ pip install -r requirements_client.txt
 ### Run Server
 - To run server:
 ```
-docker run --gpus=1 -itd --add-host=host.docker.internal:host-gateway -p 8050-8052:8000-8002 -v ${PWD}/model_repository:/models --name vc_test vc-test:latest tritonserver --model-repository=/models
+docker run --gpus=1 -itd --shm-size 4gb -p 8050-8052:8000-8002 -v ${PWD}/model_repository:/models --name triton_pipeline triton-pipeline:latest tritonserver --model-repository=/models
 ```
 
 
