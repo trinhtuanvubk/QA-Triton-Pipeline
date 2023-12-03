@@ -1,0 +1,29 @@
+name: "vits2"
+platform: "onnxruntime_onnx"
+max_batch_size : 0
+
+input [
+  {
+    name: "input"
+    data_type: TYPE_INT64
+    dims: [-1, -1]
+  },
+   {
+    name: "input_lengths"
+    data_type: TYPE_INT64
+    dims: [-1]
+  },
+  {
+    name: "scales"
+    data_type: TYPE_FP32
+    dims: [3]
+  }
+]
+output [
+  {
+    name: "output"
+    data_type: TYPE_FP32
+    dims: [-1, -1, -1]
+  }
+ 
+]
