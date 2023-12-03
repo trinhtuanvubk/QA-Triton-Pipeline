@@ -7,3 +7,7 @@
 trash*.py
 test*.py
 docker-compose.yml
+model_repository/t5/
+**/huggingface*
+t5/
+vits2_client/
