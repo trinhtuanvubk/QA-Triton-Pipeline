@@ -1,5 +1,10 @@
 ## Triton-Pipeline
-
+### Introduction
+- This repo build a triton pipeline for simple voice question answer bot:
+    - speech to text (wav2vec2)
+    - extract intent and entity (jointbert)
+    - get avaible answer based on intent and entity (exel file)
+    - text to speech (vits)
 ### Installing
 - Create a image that wraps triton image
 ```
