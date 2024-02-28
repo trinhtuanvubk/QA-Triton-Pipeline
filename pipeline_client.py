@@ -2,7 +2,6 @@ import numpy as np
 
 from tritonclient.utils import *
 
-# import tritonclient.http as tritonhttpclient
 import tritonclient.http
 import soundfile
 import librosa

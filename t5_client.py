@@ -1,8 +1,6 @@
 import numpy as np
-
+import random
 from tritonclient.utils import *
-
-# import tritonclient.http as tritonhttpclient
 import tritonclient.http
 import soundfile
 import librosa
@@ -39,9 +37,7 @@ def t5_client():
     num_return_sequence=10
     all_tgt_texts = [tokenizer.batch_decode(output_ids[i*num_return_sequence:(i+1)*num_return_sequence], skip_special_tokens=True) for i in range(2)]
     print(all_tgt_texts)
-    import random
     final_answers = [random.choice(answer) for answer in all_tgt_texts]
     print(final_answers)
 if __name__=="__main__":
-    # main()
     t5_client()
